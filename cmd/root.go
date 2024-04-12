@@ -4,8 +4,13 @@ Copyright © 2024 Matheus Lopes <matlopes1999@gmail.com>
 package cmd
 
 import (
+	"encoding/json"
 	"os"
+	"time"
 
+	"github.com/nimbo1999/go-stress-test/internal/client"
+	"github.com/nimbo1999/go-stress-test/internal/service"
+	"github.com/nimbo1999/go-stress-test/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +18,24 @@ var rootCmd = &cobra.Command{
 	Use:   "stress-test",
 	Short: "CLI tool to run stress tests",
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		url, err := cmd.Flags().GetString("url")
+		if err != nil {
+			panic(err)
+		}
+		requests, err := cmd.Flags().GetInt("requests")
+		if err != nil {
+			panic(err)
+		}
+		concurrency, err := cmd.Flags().GetInt("concurrency")
+		if err != nil {
+			panic(err)
+		}
+
+		appHttpClient := client.NewAppHattpClient(time.Second * 10)
+		service := service.NewStressTestService(appHttpClient)
+		useCase := usecase.NewStressTestUseCase(url, requests, concurrency, service)
+		response := useCase.Execute()
+		json.NewEncoder(cmd.OutOrStdout()).Encode(response)
 	},
 }
 
