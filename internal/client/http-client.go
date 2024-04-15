@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -14,15 +15,15 @@ type appHttpClient struct {
 }
 
 func (app appHttpClient) Get(url string) (*http.Response, error) {
-	client := http.DefaultClient
-	client.Timeout = app.timeout
+	ctx, cancel := context.WithTimeout(context.Background(), app.timeout)
+	defer cancel()
 
-	request, err := http.NewRequest("GET", url, nil)
+	request, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.Do(request)
+	return http.DefaultClient.Do(request)
 }
 
 func NewAppHattpClient(timeout time.Duration) *appHttpClient {

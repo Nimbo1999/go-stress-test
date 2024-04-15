@@ -35,7 +35,9 @@ var rootCmd = &cobra.Command{
 		service := service.NewStressTestService(appHttpClient)
 		useCase := usecase.NewStressTestUseCase(url, requests, concurrency, service)
 		response := useCase.Execute()
-		json.NewEncoder(cmd.OutOrStdout()).Encode(response)
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		encoder.Encode(response)
 	},
 }
 

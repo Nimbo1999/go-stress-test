@@ -33,6 +33,7 @@ type StressTestUseCase struct {
 }
 
 func (usecase *StressTestUseCase) Execute() model.ResponseDTO {
+	fmt.Println("Initializing requests...")
 	now := time.Now()
 	concurrencyRequestsChannel := make(chan int, usecase.Concurrency)
 	resultsChannel := make(chan TestResult, usecase.Concurrency)
@@ -42,17 +43,13 @@ func (usecase *StressTestUseCase) Execute() model.ResponseDTO {
 		TotalHttpOkStatusCodeRequests: 0,
 		HttpStatusReportSummary:       make(map[int]int),
 	}
-	fmt.Println("Requests:", usecase.Requests)
-	fmt.Println("Concurrency:", usecase.Concurrency)
 
 	for i := 0; i < usecase.Concurrency; i++ {
-		fmt.Println("Adicionando as concorrencias")
 		go usecase.requestInitializer(concurrencyRequestsChannel, resultsChannel, usecase.Url, usecase.service)
 		go usecase.resultReceiver(resultsChannel, &finalResult)
 	}
 
 	for i := 0; i < usecase.Requests; i++ {
-		fmt.Println("Solicitando as requests")
 		concurrencyRequestsChannel <- i
 	}
 	close(concurrencyRequestsChannel)
@@ -65,7 +62,7 @@ func (usecase *StressTestUseCase) Execute() model.ResponseDTO {
 	close(resultsChannel)
 
 	return model.ResponseDTO{
-		TotalDuration:                 time.Since(now),
+		TotalDuration:                 fmt.Sprintf("%1.f seconds", time.Since(now).Seconds()),
 		TotalCompletedRequests:        finalResult.TotalCompletedRequests,
 		TotalHttpOkStatusCodeRequests: finalResult.TotalHttpOkStatusCodeRequests,
 		HttpStatusReportSummary:       finalResult.HttpStatusReportSummary,
@@ -78,27 +75,27 @@ func (usecase *StressTestUseCase) requestInitializer(
 	url string,
 	service service.StressTestService,
 ) {
-	for v := range channel {
-		fmt.Println("Request", v, "started")
+	for range channel {
 		testResultChannel <- service.RunTest(url)
 	}
 }
 
 func (usecase *StressTestUseCase) resultReceiver(channel chan TestResult, finalResult *model.StressTestFinalResult) {
 	for result := range channel {
-		fmt.Println("Request has been completed")
-		fmt.Println(result.HttpStatus)
-
 		if result.Error != nil {
 			if netErr, ok := result.Error.(net.Error); ok && netErr.Timeout() {
 				finalResult.AddStatusCodeToReport(http.StatusRequestTimeout)
 			} else {
 				finalResult.AddStatusCodeToReport(http.StatusInternalServerError)
 			}
+			finalResult.IncrementCompletedRequests()
+			return
 		}
 
 		if result.HttpStatus != 0 {
 			finalResult.AddStatusCodeToReport(result.HttpStatus)
+		}
+		if result.HttpStatus == http.StatusOK {
 			finalResult.IncrementHttpSuccessRequests()
 		}
 		finalResult.IncrementCompletedRequests()
